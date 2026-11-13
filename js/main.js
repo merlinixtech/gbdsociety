@@ -1,147 +1,56 @@
-// GBDS Interactive Scripts: Mobile Nav, Gallery Lightbox, Form Handling
-document.addEventListener('DOMContentLoaded', function() {
-  // 1. Mobile Menu Toggle
-  const burgerBtn = document.querySelector('.burger, [data-qa*="hamburger"], [aria-label="Toggle menu"]');
-  const mobileDropdown = document.querySelector('.block-header-layout-mobile__dropdown');
+// Goutham Buddha Development Society: mobile menu and gallery lightbox.
+(function () {
+  'use strict';
 
-  if (burgerBtn && mobileDropdown) {
-    burgerBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      mobileDropdown.classList.toggle('active');
-      const isExpanded = mobileDropdown.classList.contains('active');
-      burgerBtn.setAttribute('aria-expanded', isExpanded);
+  // Mobile menu
+  var toggle = document.querySelector('.menu-toggle');
+  var nav = document.getElementById('site-nav');
+  if (toggle && nav) {
+    toggle.addEventListener('click', function () {
+      var open = nav.classList.toggle('is-open');
+      toggle.setAttribute('aria-expanded', String(open));
     });
-
-    // Close mobile menu on link click
-    const menuLinks = mobileDropdown.querySelectorAll('a');
-    menuLinks.forEach(link => {
-      link.addEventListener('click', function() {
-        mobileDropdown.classList.remove('active');
-        burgerBtn.setAttribute('aria-expanded', 'false');
-      });
-    });
-
-    // Close when clicking outside header
-    document.addEventListener('click', function(e) {
-      if (!burgerBtn.contains(e.target) && !mobileDropdown.contains(e.target)) {
-        mobileDropdown.classList.remove('active');
-        burgerBtn.setAttribute('aria-expanded', 'false');
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && nav.classList.contains('is-open')) {
+        nav.classList.remove('is-open');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.focus();
       }
     });
   }
 
-  // 2. Gallery Lightbox
-  // Select images inside gallery elements (.image-wrapper--desktop or general content images in gallery)
-  const isGalleryPage = window.location.pathname.includes('gallery') || document.title.toLowerCase().includes('gallery');
-  let galleryImgs = [];
-  if (isGalleryPage) {
-    const desktopWrappers = document.querySelectorAll('.image-wrapper--desktop img, .image__image');
-    galleryImgs = Array.from(desktopWrappers).filter(img => {
-      const src = img.getAttribute('src') || '';
-      return src && !src.includes('logo') && !src.includes('paddy-field');
-    });
+  // Gallery lightbox (uses the native <dialog> element; links still open the image without JS)
+  var links = Array.prototype.slice.call(document.querySelectorAll('.gallery-link'));
+  var dialog = document.querySelector('dialog.lightbox');
+  if (!links.length || !dialog || typeof dialog.showModal !== 'function') return;
 
-    // Deduplicate by src
-    const seenSrc = new Set();
-    const uniqueImages = [];
-    galleryImgs.forEach(img => {
-      const src = img.currentSrc || img.src || img.getAttribute('src');
-      if (src && !seenSrc.has(src)) {
-        seenSrc.add(src);
-        uniqueImages.push({
-          element: img,
-          src: src,
-          alt: img.getAttribute('alt') || 'Gallery Photo'
-        });
-      }
-    });
+  var img = dialog.querySelector('.lb-img');
+  var caption = dialog.querySelector('.lb-caption');
+  var current = 0;
 
-    if (uniqueImages.length > 0) {
-      let lightbox = document.getElementById('gbds-lightbox');
-      if (!lightbox) {
-        lightbox = document.createElement('div');
-        lightbox.id = 'gbds-lightbox';
-        lightbox.className = 'lightbox';
-        lightbox.innerHTML = `
-          <div class="lightbox-content">
-            <button class="lightbox-close" aria-label="Close lightbox">&times;</button>
-            <img class="lightbox-image" alt="Gallery image">
-            <button class="lightbox-prev" aria-label="Previous image">&#10094;</button>
-            <button class="lightbox-next" aria-label="Next image">&#10095;</button>
-            <div class="lightbox-counter"></div>
-          </div>
-        `;
-        document.body.appendChild(lightbox);
-      }
-
-      let currentIndex = 0;
-
-      function openLightbox(index) {
-        currentIndex = index;
-        const imgObj = uniqueImages[currentIndex];
-        lightbox.classList.add('active');
-        const lbImg = lightbox.querySelector('.lightbox-image');
-        lbImg.src = imgObj.src;
-        lbImg.alt = imgObj.alt;
-        lightbox.querySelector('.lightbox-counter').textContent = (currentIndex + 1) + ' / ' + uniqueImages.length;
-        document.body.style.overflow = 'hidden';
-      }
-
-      function closeLightbox() {
-        lightbox.classList.remove('active');
-        document.body.style.overflow = '';
-      }
-
-      function prevImage() {
-        currentIndex = (currentIndex - 1 + uniqueImages.length) % uniqueImages.length;
-        openLightbox(currentIndex);
-      }
-
-      function nextImage() {
-        currentIndex = (currentIndex + 1) % uniqueImages.length;
-        openLightbox(currentIndex);
-      }
-
-      uniqueImages.forEach((imgObj, idx) => {
-        imgObj.element.style.cursor = 'pointer';
-        imgObj.element.addEventListener('click', function(e) {
-          e.preventDefault();
-          openLightbox(idx);
-        });
-      });
-
-      // Also attach to mobile image counterparts if clicked
-      document.querySelectorAll('.image-wrapper--mobile img').forEach(mImg => {
-        mImg.style.cursor = 'pointer';
-        mImg.addEventListener('click', function(e) {
-          e.preventDefault();
-          const mSrc = mImg.currentSrc || mImg.src || mImg.getAttribute('src');
-          const foundIdx = uniqueImages.findIndex(item => item.src.endsWith(mSrc) || mSrc.endsWith(item.src));
-          openLightbox(foundIdx !== -1 ? foundIdx : 0);
-        });
-      });
-
-      lightbox.querySelector('.lightbox-close').addEventListener('click', closeLightbox);
-      lightbox.querySelector('.lightbox-prev').addEventListener('click', function(e) {
-        e.stopPropagation();
-        prevImage();
-      });
-      lightbox.querySelector('.lightbox-next').addEventListener('click', function(e) {
-        e.stopPropagation();
-        nextImage();
-      });
-      lightbox.addEventListener('click', function(e) {
-        if (e.target === lightbox) {
-          closeLightbox();
-        }
-      });
-
-      document.addEventListener('keydown', function(e) {
-        if (!lightbox.classList.contains('active')) return;
-        if (e.key === 'Escape') closeLightbox();
-        if (e.key === 'ArrowLeft') prevImage();
-        if (e.key === 'ArrowRight') nextImage();
-      });
-    }
+  function show(index) {
+    current = (index + links.length) % links.length;
+    var link = links[current];
+    var image = link.querySelector('img');
+    img.src = link.getAttribute('href');
+    img.alt = image ? image.alt : '';
+    caption.textContent = (current + 1) + ' of ' + links.length;
   }
-});
+
+  links.forEach(function (link, i) {
+    link.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      show(i);
+      dialog.showModal();
+    });
+  });
+
+  dialog.querySelector('.lb-close').addEventListener('click', function () { dialog.close(); });
+  dialog.querySelector('.lb-prev').addEventListener('click', function () { show(current - 1); });
+  dialog.querySelector('.lb-next').addEventListener('click', function () { show(current + 1); });
+  dialog.addEventListener('click', function (ev) { if (ev.target === dialog) dialog.close(); });
+  dialog.addEventListener('keydown', function (ev) {
+    if (ev.key === 'ArrowLeft') show(current - 1);
+    if (ev.key === 'ArrowRight') show(current + 1);
+  });
+})();
