@@ -1,5 +1,6 @@
-node_modules
-shots
+node_modules/
+.claude/
+.wrangler/
 .DS_Store
 ._*
-
+shots/
